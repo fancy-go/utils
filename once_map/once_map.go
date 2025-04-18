@@ -37,7 +37,7 @@ func (m *OnceMap[K, V]) Load(k K) (V, bool) {
 	if ok {
 		return v.(*initItem[V]).unwrap(), ok
 	}
-	return v, ok
+	return v.(V), ok
 }
 
 func (m *OnceMap[K, V]) Store(k K, v V) {

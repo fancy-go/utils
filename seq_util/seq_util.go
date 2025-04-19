@@ -1,6 +1,8 @@
 package seq_util
 
-import "iter"
+import (
+	"iter"
+)
 
 func Map[F any, T any](seq iter.Seq[F], fn func(F) T) iter.Seq[T] {
 	return func(yield func(T) bool) {
@@ -49,6 +51,24 @@ func FlatOuterSlice[F any](s []iter.Seq[F]) iter.Seq[F] {
 		for _, innerSeq := range s {
 			for item := range innerSeq {
 				if !yield(item) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func FlatInnerResultSlice[F any](s iter.Seq2[[]F, error]) iter.Seq2[F, error] {
+	var zero F
+	return func(yield func(F, error) bool) {
+		for innerSeq, err := range s {
+			if err != nil {
+				if !yield(zero, err) {
+					return
+				}
+			}
+			for _, item := range innerSeq {
+				if !yield(item, nil) {
 					return
 				}
 			}
@@ -144,6 +164,21 @@ func Log[T any](seq iter.Seq[T], fn func(int64, T), sampleRate int64) iter.Seq[T
 	}
 }
 
+func Log2[T1 any, T2 any](seq iter.Seq2[T1, T2], fn func(int64, T1, T2), sampleRate int64) iter.Seq2[T1, T2] {
+	var count int64
+	return func(yield func(T1, T2) bool) {
+		for k, v := range seq {
+			count++
+			if count%sampleRate == 0 {
+				fn(count, k, v)
+			}
+			if !yield(k, v) {
+				return
+			}
+		}
+	}
+}
+
 func Drain[T any](seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
 	if fn == nil {
 		fn = func(_ T) bool { return true }
@@ -167,9 +202,46 @@ func Reduce[T any, R any](seq iter.Seq[T], fn func(R, T) R, init R) R {
 	return init
 }
 
+func ReduceUntil[T any, R any](seq iter.Seq[T], fn func(R, T) (R, bool), init R) R {
+	var cont bool
+	for v := range seq {
+		init, cont = fn(init, v)
+		if !cont {
+			break
+		}
+	}
+	return init
+}
+
+func Reduce2[T1 any, T2 any, R any](seq iter.Seq2[T1, T2], fn func(R, T1, T2) R, init R) R {
+	for k, v := range seq {
+		init = fn(init, k, v)
+	}
+	return init
+}
+
+func ReduceUntil2[T1 any, T2 any, R any](seq iter.Seq2[T1, T2], fn func(R, T1, T2) (R, bool), init R) R {
+	var cont bool
+	for k, v := range seq {
+		init, cont = fn(init, k, v)
+		if !cont {
+			break
+		}
+	}
+	return init
+}
+
 func Count[T any](seq iter.Seq[T]) int {
 	count := 0
 	for _ = range seq {
+		count++
+	}
+	return count
+}
+
+func Count2[T1 any, T2 any](seq iter.Seq2[T1, T2]) int {
+	count := 0
+	for _, _ = range seq {
 		count++
 	}
 	return count

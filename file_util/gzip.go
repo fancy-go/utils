@@ -10,6 +10,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 )
 
 func TarGzDir(dir string, archive string) (err error) {
@@ -84,4 +86,66 @@ func TarGzDir(dir string, archive string) (err error) {
 	}
 
 	return nil
+}
+
+func UnTarGzFile(file string, dir string) ([]string, error) {
+	in, err := os.Open(file)
+	if err != nil {
+		return nil, errors.Wrapf(err, "open file %s error", file)
+	}
+	defer in.Close()
+
+	gz, err := gzip.NewReader(in)
+	if err != nil {
+		return nil, errors.Wrapf(err, "gzip reader error")
+	}
+	defer gz.Close()
+
+	tarReader := tar.NewReader(gz)
+	var rootSets = make(map[string]struct{})
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break // End of archive
+		}
+		if err != nil {
+			return nil, errors.Wrapf(err, "tar reader error")
+		}
+		rootSets[strings.SplitN(header.Name, "/", 2)[0]] = struct{}{}
+
+		target := filepath.Join(dir, header.Name)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			err = os.MkdirAll(target, 0755)
+			if err != nil {
+				return nil, errors.Wrapf(err, "mkdir %s error", target)
+			}
+		case tar.TypeReg:
+
+			err = os.MkdirAll(filepath.Dir(target), 0755)
+			if err != nil {
+				return nil, errors.Wrapf(err, "mkdir %s error", filepath.Dir(target))
+			}
+
+			outFile, err := os.Create(target)
+			if err != nil {
+				return nil, errors.Wrapf(err, "create file %s error", target)
+			}
+			defer outFile.Close()
+			if _, err = io.Copy(outFile, tarReader); err != nil {
+				return nil, errors.Wrapf(err, "copy file %s error", target)
+			}
+		default:
+			log.Printf("unknown type: %c in file %s", header.Typeflag, target)
+		}
+	}
+
+	var rootFiles []string
+	for root := range rootSets {
+		rootFiles = append(rootFiles, root)
+	}
+	sort.Strings(rootFiles)
+	return rootFiles, nil
 }

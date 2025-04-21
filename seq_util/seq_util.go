@@ -343,3 +343,45 @@ func Buffer2[F1, F2 any](seq iter.Seq2[F1, F2], size int) iter.Seq2[F1, F2] {
 		}
 	}
 }
+
+func Batch[T any](seq iter.Seq[T], batchSize int) iter.Seq[[]T] {
+	return func(yield func([]T) bool) {
+		var batch []T
+		for v := range seq {
+			batch = append(batch, v)
+			if len(batch) == batchSize {
+				if !yield(batch) {
+					return
+				}
+				batch = nil
+			}
+		}
+		if len(batch) > 0 {
+			if !yield(batch) {
+				return
+			}
+		}
+	}
+}
+
+func FromSlice2[F1, F2 any](slice []Pair[F1, F2]) iter.Seq2[F1, F2] {
+	return func(yield func(F1, F2) bool) {
+		for _, item := range slice {
+			if !yield(item.K, item.V) {
+				return
+			}
+		}
+	}
+}
+
+func Filter[T any](seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for v := range seq {
+			if fn(v) {
+				if !yield(v) {
+					return
+				}
+			}
+		}
+	}
+}

@@ -385,3 +385,15 @@ func Filter[T any](seq iter.Seq[T], fn func(T) bool) iter.Seq[T] {
 		}
 	}
 }
+
+func Filter2[T1 any, T2 any](seq iter.Seq2[T1, T2], fn func(T1, T2) bool) iter.Seq2[T1, T2] {
+	return func(yield func(T1, T2) bool) {
+		for k, v := range seq {
+			if fn(k, v) {
+				if !yield(k, v) {
+					return
+				}
+			}
+		}
+	}
+}

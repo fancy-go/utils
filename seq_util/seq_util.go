@@ -397,3 +397,33 @@ func Filter2[T1 any, T2 any](seq iter.Seq2[T1, T2], fn func(T1, T2) bool) iter.S
 		}
 	}
 }
+
+func Skip[T any](seq iter.Seq[T], n int) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		count := 0
+		for v := range seq {
+			if count < n {
+				count++
+				continue
+			}
+			if !yield(v) {
+				return
+			}
+		}
+	}
+}
+
+func Skip2[T1 any, T2 any](seq iter.Seq2[T1, T2], n int) iter.Seq2[T1, T2] {
+	return func(yield func(T1, T2) bool) {
+		count := 0
+		for k, v := range seq {
+			if count < n {
+				count++
+				continue
+			}
+			if !yield(k, v) {
+				return
+			}
+		}
+	}
+}
